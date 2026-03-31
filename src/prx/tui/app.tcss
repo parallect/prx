@@ -1,0 +1,33 @@
+Screen {
+    background: $surface;
+}
+
+#provider-list {
+    width: 1fr;
+    max-width: 30;
+    border-right: solid $primary;
+}
+
+#report-content {
+    width: 3fr;
+    padding: 1 2;
+}
+
+#claims-table {
+    height: 1fr;
+}
+
+#sources-table {
+    height: 1fr;
+}
+
+.metadata-row {
+    height: auto;
+    padding: 0 1;
+}
+
+.panel-title {
+    text-style: bold;
+    color: $text;
+    padding: 1 0;
+}
