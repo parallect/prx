@@ -41,16 +41,13 @@ class PrxSettings(BaseSettings):
     )
 
     # prxhub
-    prxhub_api_key: str = ""
+    prxhub_url: str = ""
     default_visibility: str = "public"
 
     # Signing
     key_path: str = ""
     auto_sign: bool = True
     identity: str = ""
-
-    # Parallect API (for paid enhance)
-    parallect_api_key: str = ""
 
     @classmethod
     def load(cls) -> PrxSettings:
@@ -78,12 +75,12 @@ def _flatten_toml(data: dict, prefix: str = "") -> dict:
     """Flatten nested TOML sections into dot-free keys matching settings fields."""
     result: dict = {}
     key_map = {
-        "prxhub.api_key": "prxhub_api_key",
+        "prxhub.url": "prxhub_url",
         "prxhub.default_visibility": "default_visibility",
+        "defaults.visibility": "default_visibility",
         "signing.key_path": "key_path",
         "signing.auto_sign": "auto_sign",
         "signing.identity": "identity",
-        "parallect_api.api_key": "parallect_api_key",
     }
 
     for section_key, value in data.items():

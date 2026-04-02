@@ -9,7 +9,7 @@ from rich.console import Console
 from rich.table import Table
 
 from prx.api import create_branch, list_branches
-from prx.config_mod.settings import PrxSettings
+from prx.api.signing import has_signing_key
 
 console = Console()
 
@@ -19,21 +19,20 @@ def branch_cmd(
     repo_id: str = typer.Option(..., "--repo", "-r", help="Repo ID"),
     name: str = typer.Option(None, "--name", "-n", help="Branch name (for create)"),
     from_branch: str = typer.Option(None, "--from", help="Source branch to copy head from"),
-    api_key: str = typer.Option(None, "--api-key", help="prxhub API key"),
 ) -> None:
     """Manage branches on a prxhub repo."""
-    settings = PrxSettings.load()
-    key = api_key or settings.prxhub_api_key
-
     if action == "create":
         if not name:
             console.print("[red]--name is required for create[/red]")
             raise typer.Exit(1)
-        if not key:
-            console.print("[red]API key required.[/red]")
+        if not has_signing_key():
+            console.print(
+                "[red]No signing key found. "
+                "Run 'prx keys generate' and register the key on prxhub.[/red]"
+            )
             raise typer.Exit(1)
         result = asyncio.run(
-            create_branch(repo_id, name, key, from_branch=from_branch)
+            create_branch(repo_id, name, from_branch=from_branch)
         )
         console.print(f"[green]Created branch:[/green] {result.name}")
         console.print(f"  ID: {result.id}")
@@ -41,7 +40,7 @@ def branch_cmd(
             console.print(f"  Head: {result.head_bundle_id}")
 
     elif action == "list":
-        branches = asyncio.run(list_branches(repo_id, api_key=key or None))
+        branches = asyncio.run(list_branches(repo_id))
         if not branches:
             console.print("[dim]No branches found.[/dim]")
             return

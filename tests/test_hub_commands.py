@@ -116,7 +116,7 @@ class TestCloneCmd:
     def test_clone_basic(self, mock_get, mock_download):
         mock_get.return_value = FakeBundleSummary()
 
-        async def fake_download(bid, path, api_key=None):
+        async def fake_download(bid, path, **kwargs):
             path.write_bytes(b"fake content")
             return path
 
@@ -132,17 +132,15 @@ class TestCloneCmd:
 
 class TestForkCmd:
     @patch("prx.api.fork_bundle", new_callable=AsyncMock)
-    @patch("prx.config_mod.settings.PrxSettings.load")
-    def test_fork_with_api_key(self, mock_load, mock_fork):
-        mock_load.return_value = MagicMock(prxhub_api_key="test-key", parallect_api_key="")
+    @patch("prx.api.signing.has_signing_key", return_value=True)
+    def test_fork_with_signing_key(self, mock_has_key, mock_fork):
         mock_fork.return_value = FakeForkResult()
-        result = runner.invoke(prx_app, ["fork", "uuid-1234", "--api-key", "test-key"])
+        result = runner.invoke(prx_app, ["fork", "uuid-1234"])
         assert result.exit_code == 0
         assert "Forked" in result.output
 
-    @patch("prx.config_mod.settings.PrxSettings.load")
-    def test_fork_no_api_key_errors(self, mock_load):
-        mock_load.return_value = MagicMock(prxhub_api_key="", parallect_api_key="")
+    @patch("prx.api.signing.has_signing_key", return_value=False)
+    def test_fork_no_signing_key_errors(self, mock_has_key):
         result = runner.invoke(prx_app, ["fork", "uuid-1234"])
         assert result.exit_code == 1
 
@@ -154,20 +152,18 @@ class TestForkCmd:
 
 class TestStarCmd:
     @patch("prx.api.star_bundle", new_callable=AsyncMock)
-    @patch("prx.config_mod.settings.PrxSettings.load")
-    def test_star_basic(self, mock_load, mock_star):
-        mock_load.return_value = MagicMock(prxhub_api_key="test-key", parallect_api_key="")
+    @patch("prx.api.signing.has_signing_key", return_value=True)
+    def test_star_basic(self, mock_has_key, mock_star):
         mock_star.return_value = True
-        result = runner.invoke(prx_app, ["star", "uuid-1234", "--api-key", "test-key"])
+        result = runner.invoke(prx_app, ["star", "uuid-1234"])
         assert result.exit_code == 0
         assert "Starred" in result.output
 
     @patch("prx.api.unstar_bundle", new_callable=AsyncMock)
-    @patch("prx.config_mod.settings.PrxSettings.load")
-    def test_unstar(self, mock_load, mock_unstar):
-        mock_load.return_value = MagicMock(prxhub_api_key="test-key", parallect_api_key="")
+    @patch("prx.api.signing.has_signing_key", return_value=True)
+    def test_unstar(self, mock_has_key, mock_unstar):
         mock_unstar.return_value = False
-        result = runner.invoke(prx_app, ["star", "uuid-1234", "--unstar", "--api-key", "test-key"])
+        result = runner.invoke(prx_app, ["star", "uuid-1234", "--unstar"])
         assert result.exit_code == 0
         assert "Unstarred" in result.output
 
@@ -179,43 +175,35 @@ class TestStarCmd:
 
 class TestRepoCmd:
     @patch("prx.cli.repo.create_repo", new_callable=AsyncMock)
-    @patch("prx.cli.repo.PrxSettings")
-    def test_repo_create(self, mock_settings, mock_create):
-        mock_settings.load.return_value = MagicMock(prxhub_api_key="test-key")
+    @patch("prx.cli.repo.has_signing_key", return_value=True)
+    def test_repo_create(self, mock_has_key, mock_create):
         mock_create.return_value = FakeRepoInfo()
         result = runner.invoke(prx_app, [
-            "repo", "create", "--name", "my-research", "--api-key", "test-key"
+            "repo", "create", "--name", "my-research",
         ])
         assert result.exit_code == 0
         assert "my-research" in result.output
 
     @patch("prx.cli.repo.list_repos", new_callable=AsyncMock)
-    @patch("prx.cli.repo.PrxSettings")
-    def test_repo_list(self, mock_settings, mock_list):
-        mock_settings.load.return_value = MagicMock(prxhub_api_key="")
+    def test_repo_list(self, mock_list):
         mock_list.return_value = [FakeRepoInfo()]
         result = runner.invoke(prx_app, ["repo", "list"])
         assert result.exit_code == 0
         assert "my-research" in result.output
 
     @patch("prx.cli.repo.list_repos", new_callable=AsyncMock)
-    @patch("prx.cli.repo.PrxSettings")
-    def test_repo_list_empty(self, mock_settings, mock_list):
-        mock_settings.load.return_value = MagicMock(prxhub_api_key="")
+    def test_repo_list_empty(self, mock_list):
         mock_list.return_value = []
         result = runner.invoke(prx_app, ["repo", "list"])
         assert result.exit_code == 0
         assert "No repos" in result.output
 
-    @patch("prx.cli.repo.PrxSettings")
-    def test_repo_create_no_name(self, mock_settings):
-        mock_settings.load.return_value = MagicMock(prxhub_api_key="test-key")
-        result = runner.invoke(prx_app, ["repo", "create", "--api-key", "test-key"])
+    @patch("prx.cli.repo.has_signing_key", return_value=True)
+    def test_repo_create_no_name(self, mock_has_key):
+        result = runner.invoke(prx_app, ["repo", "create"])
         assert result.exit_code == 1
 
-    @patch("prx.cli.repo.PrxSettings")
-    def test_repo_unknown_action(self, mock_settings):
-        mock_settings.load.return_value = MagicMock(prxhub_api_key="")
+    def test_repo_unknown_action(self):
         result = runner.invoke(prx_app, ["repo", "unknown"])
         assert result.exit_code == 1
 
@@ -227,31 +215,26 @@ class TestRepoCmd:
 
 class TestBranchCmd:
     @patch("prx.cli.branch.create_branch", new_callable=AsyncMock)
-    @patch("prx.cli.branch.PrxSettings")
-    def test_branch_create(self, mock_settings, mock_create):
-        mock_settings.load.return_value = MagicMock(prxhub_api_key="test-key")
+    @patch("prx.cli.branch.has_signing_key", return_value=True)
+    def test_branch_create(self, mock_has_key, mock_create):
         mock_create.return_value = FakeBranchInfo()
         result = runner.invoke(prx_app, [
             "branch", "create", "--repo", "repo-uuid", "--name", "feature-1",
-            "--api-key", "test-key",
         ])
         assert result.exit_code == 0
         assert "feature-1" in result.output
 
     @patch("prx.cli.branch.list_branches", new_callable=AsyncMock)
-    @patch("prx.cli.branch.PrxSettings")
-    def test_branch_list(self, mock_settings, mock_list):
-        mock_settings.load.return_value = MagicMock(prxhub_api_key="")
+    def test_branch_list(self, mock_list):
         mock_list.return_value = [FakeBranchInfo(name="main"), FakeBranchInfo(name="feature-1")]
         result = runner.invoke(prx_app, ["branch", "list", "--repo", "repo-uuid"])
         assert result.exit_code == 0
         assert "main" in result.output
 
-    @patch("prx.cli.branch.PrxSettings")
-    def test_branch_create_no_name(self, mock_settings):
-        mock_settings.load.return_value = MagicMock(prxhub_api_key="test-key")
+    @patch("prx.cli.branch.has_signing_key", return_value=True)
+    def test_branch_create_no_name(self, mock_has_key):
         result = runner.invoke(prx_app, [
-            "branch", "create", "--repo", "repo-uuid", "--api-key", "test-key"
+            "branch", "create", "--repo", "repo-uuid",
         ])
         assert result.exit_code == 1
 
@@ -263,20 +246,21 @@ class TestBranchCmd:
 
 class TestPushCmd:
     @patch("prx.cli.push.push_bundle", new_callable=AsyncMock)
+    @patch("prx.cli.push.has_signing_key", return_value=True)
     @patch("prx.cli.push.PrxSettings")
-    def test_push_basic(self, mock_settings, mock_push):
-        mock_settings.load.return_value = MagicMock(prxhub_api_key="test-key")
+    def test_push_basic(self, mock_settings, mock_has_key, mock_push):
+        mock_settings.load.return_value = MagicMock(prxhub_url="")
         mock_push.return_value = FakePushResult()
         result = runner.invoke(prx_app, [
             "push", "--repo", "repo-uuid", "--bundle", "bundle-uuid",
-            "--api-key", "test-key",
         ])
         assert result.exit_code == 0
         assert "main" in result.output
 
+    @patch("prx.cli.push.has_signing_key", return_value=False)
     @patch("prx.cli.push.PrxSettings")
-    def test_push_no_api_key(self, mock_settings):
-        mock_settings.load.return_value = MagicMock(prxhub_api_key="")
+    def test_push_no_signing_key(self, mock_settings, mock_has_key):
+        mock_settings.load.return_value = MagicMock(prxhub_url="")
         result = runner.invoke(prx_app, [
             "push", "--repo", "repo-uuid", "--bundle", "bundle-uuid",
         ])
@@ -290,41 +274,34 @@ class TestPushCmd:
 
 class TestMrCmd:
     @patch("prx.cli.mr.create_merge_request", new_callable=AsyncMock)
-    @patch("prx.cli.mr.PrxSettings")
-    def test_mr_create(self, mock_settings, mock_create):
-        mock_settings.load.return_value = MagicMock(prxhub_api_key="test-key")
+    @patch("prx.cli.mr.has_signing_key", return_value=True)
+    def test_mr_create(self, mock_has_key, mock_create):
         mock_create.return_value = FakeMRInfo()
         result = runner.invoke(prx_app, [
             "mr", "create", "--repo", "repo-uuid",
             "--source", "feature-1", "--title", "Test MR",
-            "--api-key", "test-key",
         ])
         assert result.exit_code == 0
         assert "Test MR" in result.output
 
     @patch("prx.cli.mr.merge_mr", new_callable=AsyncMock)
-    @patch("prx.cli.mr.PrxSettings")
-    def test_mr_merge(self, mock_settings, mock_merge):
-        mock_settings.load.return_value = MagicMock(prxhub_api_key="test-key")
+    @patch("prx.cli.mr.has_signing_key", return_value=True)
+    def test_mr_merge(self, mock_has_key, mock_merge):
         mock_merge.return_value = {"merged": True, "targetBranch": "main"}
         result = runner.invoke(prx_app, [
             "mr", "merge", "--repo", "repo-uuid", "--mr-id", "mr-uuid",
-            "--api-key", "test-key",
         ])
         assert result.exit_code == 0
         assert "Merged" in result.output
 
-    @patch("prx.cli.mr.PrxSettings")
-    def test_mr_create_missing_source(self, mock_settings):
-        mock_settings.load.return_value = MagicMock(prxhub_api_key="test-key")
+    @patch("prx.cli.mr.has_signing_key", return_value=True)
+    def test_mr_create_missing_source(self, mock_has_key):
         result = runner.invoke(prx_app, [
             "mr", "create", "--repo", "repo-uuid", "--title", "No Source",
-            "--api-key", "test-key",
         ])
         assert result.exit_code == 1
 
-    @patch("prx.cli.mr.PrxSettings")
-    def test_mr_no_api_key(self, mock_settings):
-        mock_settings.load.return_value = MagicMock(prxhub_api_key="")
+    @patch("prx.cli.mr.has_signing_key", return_value=False)
+    def test_mr_no_signing_key(self, mock_has_key):
         result = runner.invoke(prx_app, ["mr", "create", "--repo", "r"])
         assert result.exit_code == 1

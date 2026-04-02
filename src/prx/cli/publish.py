@@ -13,27 +13,28 @@ console = Console()
 
 def publish_cmd(
     bundle_path: str = typer.Argument(help="Path to .prx bundle"),
-    visibility: str = typer.Option("public", "--visibility", help="public, unlisted, or private"),
+    visibility: str | None = typer.Option(None, "--visibility", help="public, unlisted, or private (default: from config)"),
     tags: str | None = typer.Option(None, "--tags", help="Comma-separated tags"),
-    api_key: str | None = typer.Option(None, "--api-key", help="prxhub API key"),
 ) -> None:
     """Upload a .prx bundle to prxhub.com."""
-    asyncio.run(_publish_async(bundle_path, visibility, tags, api_key))
+    asyncio.run(_publish_async(bundle_path, visibility, tags))
 
 
 async def _publish_async(
-    bundle_path: str, visibility: str, tags: str | None, api_key: str | None
+    bundle_path: str, visibility: str | None, tags: str | None
 ) -> None:
     from prx.api import publish_bundle
+    from prx.api.signing import has_signing_key
     from prx.config_mod.settings import PrxSettings
 
     settings = PrxSettings.load()
-    key = api_key or settings.prxhub_api_key or settings.parallect_api_key
+    vis = visibility or settings.default_visibility
+    hub_url = settings.prxhub_url or None
 
-    if not key:
+    if not has_signing_key():
         console.print(
-            "[red]API key required for publishing. "
-            "Set via --api-key or in config.[/red]"
+            "[red]No signing key found. "
+            "Run 'prx keys generate' and register the key on prxhub.[/red]"
         )
         raise typer.Exit(1)
 
@@ -45,12 +46,17 @@ async def _publish_async(
     tag_list = [t.strip() for t in tags.split(",")] if tags else []
 
     console.print(f"[bold]Publishing:[/bold] {path.name}")
-    console.print(f"[dim]Visibility: {visibility}[/dim]")
+    console.print(f"[dim]Visibility: {vis}[/dim]")
+    if hub_url:
+        console.print(f"[dim]Hub: {hub_url}[/dim]")
     if tag_list:
         console.print(f"[dim]Tags: {', '.join(tag_list)}[/dim]")
 
     try:
-        result = await publish_bundle(path, key, visibility=visibility, tags=tag_list)
+        kwargs: dict = {"visibility": vis, "tags": tag_list}
+        if hub_url:
+            kwargs["api_url"] = hub_url
+        result = await publish_bundle(path, **kwargs)
         console.print("[green]Published![/green]")
         console.print(f"  URL: {result.bundle_url}")
     except Exception as e:

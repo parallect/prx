@@ -12,30 +12,26 @@ console = Console()
 
 def fork_cmd(
     bundle_id: str = typer.Argument(help="Bundle ID to fork"),
-    api_key: str | None = typer.Option(None, "--api-key", help="prxhub API key"),
 ) -> None:
     """Fork a research bundle on prxhub.com."""
-    asyncio.run(_fork_async(bundle_id, api_key))
+    asyncio.run(_fork_async(bundle_id))
 
 
-async def _fork_async(bundle_id: str, api_key: str | None) -> None:
+async def _fork_async(bundle_id: str) -> None:
     from prx.api import fork_bundle
-    from prx.config_mod.settings import PrxSettings
+    from prx.api.signing import has_signing_key
 
-    settings = PrxSettings.load()
-    key = api_key or settings.prxhub_api_key or settings.parallect_api_key
-
-    if not key:
+    if not has_signing_key():
         console.print(
-            "[red]API key required for forking. "
-            "Set via --api-key or in config.[/red]"
+            "[red]No signing key found. "
+            "Run 'prx keys generate' and register the key on prxhub.[/red]"
         )
         raise typer.Exit(1)
 
     console.print(f"[bold]Forking bundle:[/bold] {bundle_id[:8]}...")
 
     try:
-        result = await fork_bundle(bundle_id, key)
+        result = await fork_bundle(bundle_id)
         console.print("[green]Forked![/green]")
         console.print(f"  New ID: {result.id}")
         console.print(f"  Slug: {result.slug}")

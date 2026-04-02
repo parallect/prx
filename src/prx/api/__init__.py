@@ -2,12 +2,31 @@
 
 from __future__ import annotations
 
+import json
+import os
 from dataclasses import dataclass
 from pathlib import Path
 
 import httpx
 
-PRXHUB_API_URL = "https://prxhub.com"
+from prx.api.signing import sign_request
+
+PRXHUB_API_URL = os.environ.get("PRXHUB_API_URL", "https://prxhub.com")
+
+
+def _signed_headers(
+    method: str, url: str, body: bytes | str = b""
+) -> dict[str, str]:
+    """Build auth headers by signing the request with the local key."""
+    return sign_request(method, url, body)
+
+
+def _auth_headers_for_json(
+    method: str, url: str, json_body: dict | None = None
+) -> dict[str, str]:
+    """Sign a request whose body is JSON-serialized."""
+    body = json.dumps(json_body, separators=(",", ":")).encode() if json_body else b""
+    return _signed_headers(method, url, body)
 
 
 @dataclass
@@ -124,35 +143,52 @@ def _make_bundle_summary(data: dict) -> BundleSummary:
 
 async def publish_bundle(
     bundle_path: Path,
-    api_key: str,
     visibility: str = "public",
     tags: list[str] | None = None,
     api_url: str = PRXHUB_API_URL,
 ) -> PublishResult:
     """Upload a .prx bundle to prxhub.com."""
+    file_size = bundle_path.stat().st_size
+
     async with httpx.AsyncClient(timeout=120.0) as client:
+        # Step 1: Initiate upload
+        upload_url = f"{api_url}/api/bundles/upload"
+        upload_body = {"filename": bundle_path.name, "size_bytes": file_size}
         response = await client.post(
-            f"{api_url}/api/bundles/upload",
-            headers={"Authorization": f"Bearer {api_key}"},
-            json={"visibility": visibility, "tags": tags or []},
+            upload_url,
+            headers=_auth_headers_for_json("POST", upload_url, upload_body),
+            json=upload_body,
         )
         response.raise_for_status()
         upload_data = response.json()
 
+        # Step 2: Upload file to presigned URL
         with open(bundle_path, "rb") as f:
             await client.put(upload_data["upload_url"], content=f.read())
 
+        # Step 3: Confirm upload
+        confirm_url = f"{api_url}/api/bundles/confirm"
+        confirm_body = {
+            "upload_id": upload_data["upload_id"],
+            "storage_key": upload_data["storage_key"],
+            "visibility": visibility,
+            "tags": tags or [],
+        }
         confirm = await client.post(
-            f"{api_url}/api/bundles/confirm",
-            headers={"Authorization": f"Bearer {api_key}"},
-            json={"upload_id": upload_data["upload_id"]},
+            confirm_url,
+            headers=_auth_headers_for_json("POST", confirm_url, confirm_body),
+            json=confirm_body,
         )
         confirm.raise_for_status()
         result = confirm.json()
 
+        bundle_url = result.get("bundle_url") or result.get("url", "")
+        if bundle_url and not bundle_url.startswith("http"):
+            bundle_url = f"{api_url}{bundle_url}"
+
         return PublishResult(
-            bundle_url=result["bundle_url"],
-            bundle_id=result["bundle_id"],
+            bundle_url=bundle_url,
+            bundle_id=result.get("bundle_id", result.get("id", "")),
         )
 
 
@@ -199,19 +235,14 @@ async def get_bundle(
 async def download_bundle(
     bundle_id: str,
     output_path: Path,
-    api_key: str | None = None,
     api_url: str = PRXHUB_API_URL,
 ) -> Path:
     """Download a .prx bundle from prxhub.com."""
-    headers = {}
-    if api_key:
-        headers["Authorization"] = f"Bearer {api_key}"
+    url = f"{api_url}/api/bundles/{bundle_id}/download"
+    headers = _signed_headers("GET", url)
 
     async with httpx.AsyncClient(timeout=120.0) as client:
-        response = await client.get(
-            f"{api_url}/api/bundles/{bundle_id}/download",
-            headers=headers,
-        )
+        response = await client.get(url, headers=headers)
         response.raise_for_status()
         download_url = response.json()["download_url"]
 
@@ -223,14 +254,14 @@ async def download_bundle(
 
 async def fork_bundle(
     bundle_id: str,
-    api_key: str,
     api_url: str = PRXHUB_API_URL,
 ) -> ForkResult:
     """Fork a bundle on prxhub.com."""
+    url = f"{api_url}/api/bundles/{bundle_id}/fork"
     async with httpx.AsyncClient(timeout=60.0) as client:
         response = await client.post(
-            f"{api_url}/api/bundles/{bundle_id}/fork",
-            headers={"Authorization": f"Bearer {api_key}"},
+            url,
+            headers=_signed_headers("POST", url),
         )
         response.raise_for_status()
         data = response.json()
@@ -243,14 +274,14 @@ async def fork_bundle(
 
 async def star_bundle(
     bundle_id: str,
-    api_key: str,
     api_url: str = PRXHUB_API_URL,
 ) -> bool:
     """Star a bundle on prxhub.com. Returns True if starred."""
+    url = f"{api_url}/api/bundles/{bundle_id}/star"
     async with httpx.AsyncClient(timeout=30.0) as client:
         response = await client.post(
-            f"{api_url}/api/bundles/{bundle_id}/star",
-            headers={"Authorization": f"Bearer {api_key}"},
+            url,
+            headers=_signed_headers("POST", url),
         )
         response.raise_for_status()
         return response.json().get("starred", True)
@@ -258,14 +289,14 @@ async def star_bundle(
 
 async def unstar_bundle(
     bundle_id: str,
-    api_key: str,
     api_url: str = PRXHUB_API_URL,
 ) -> bool:
     """Unstar a bundle on prxhub.com. Returns False if unstarred."""
+    url = f"{api_url}/api/bundles/{bundle_id}/star"
     async with httpx.AsyncClient(timeout=30.0) as client:
         response = await client.delete(
-            f"{api_url}/api/bundles/{bundle_id}/star",
-            headers={"Authorization": f"Bearer {api_key}"},
+            url,
+            headers=_signed_headers("DELETE", url),
         )
         response.raise_for_status()
         return response.json().get("starred", False)
@@ -291,17 +322,18 @@ def _make_repo_info(data: dict) -> RepoInfo:
 
 async def create_repo(
     name: str,
-    api_key: str,
     description: str | None = None,
     visibility: str = "public",
     api_url: str = PRXHUB_API_URL,
 ) -> RepoInfo:
     """Create a new repo on prxhub."""
+    url = f"{api_url}/api/repos"
+    body = {"name": name, "description": description, "visibility": visibility}
     async with httpx.AsyncClient(timeout=30.0) as client:
         response = await client.post(
-            f"{api_url}/api/repos",
-            headers={"Authorization": f"Bearer {api_key}"},
-            json={"name": name, "description": description, "visibility": visibility},
+            url,
+            headers=_auth_headers_for_json("POST", url, body),
+            json=body,
         )
         response.raise_for_status()
         return _make_repo_info(response.json())
@@ -309,37 +341,31 @@ async def create_repo(
 
 async def list_repos(
     owner: str | None = None,
-    api_key: str | None = None,
     api_url: str = PRXHUB_API_URL,
 ) -> list[RepoInfo]:
     """List repos."""
-    headers = {}
-    if api_key:
-        headers["Authorization"] = f"Bearer {api_key}"
+    url = f"{api_url}/api/repos"
     params: dict[str, str] = {}
     if owner:
         params["owner"] = owner
 
+    headers = _signed_headers("GET", url)
     async with httpx.AsyncClient(timeout=30.0) as client:
-        response = await client.get(f"{api_url}/api/repos", headers=headers, params=params)
+        response = await client.get(url, headers=headers, params=params)
         response.raise_for_status()
         return [_make_repo_info(r) for r in response.json().get("repos", [])]
 
 
 async def list_branches(
     repo_id: str,
-    api_key: str | None = None,
     api_url: str = PRXHUB_API_URL,
 ) -> list[BranchInfo]:
     """List branches for a repo."""
-    headers = {}
-    if api_key:
-        headers["Authorization"] = f"Bearer {api_key}"
+    url = f"{api_url}/api/repos/{repo_id}/branches"
+    headers = _signed_headers("GET", url)
 
     async with httpx.AsyncClient(timeout=30.0) as client:
-        response = await client.get(
-            f"{api_url}/api/repos/{repo_id}/branches", headers=headers
-        )
+        response = await client.get(url, headers=headers)
         response.raise_for_status()
         data = response.json()
         return [
@@ -355,19 +381,19 @@ async def list_branches(
 async def create_branch(
     repo_id: str,
     name: str,
-    api_key: str,
     from_branch: str | None = None,
     api_url: str = PRXHUB_API_URL,
 ) -> BranchInfo:
     """Create a new branch."""
+    url = f"{api_url}/api/repos/{repo_id}/branches"
     body: dict[str, str] = {"name": name}
     if from_branch:
         body["fromBranch"] = from_branch
 
     async with httpx.AsyncClient(timeout=30.0) as client:
         response = await client.post(
-            f"{api_url}/api/repos/{repo_id}/branches",
-            headers={"Authorization": f"Bearer {api_key}"},
+            url,
+            headers=_auth_headers_for_json("POST", url, body),
             json=body,
         )
         response.raise_for_status()
@@ -382,12 +408,12 @@ async def create_branch(
 async def push_bundle(
     repo_id: str,
     bundle_id: str,
-    api_key: str,
     branch: str | None = None,
     message: str | None = None,
     api_url: str = PRXHUB_API_URL,
 ) -> PushResult:
     """Push a bundle to a repo branch."""
+    url = f"{api_url}/api/repos/{repo_id}/push"
     body: dict[str, str] = {"bundleId": bundle_id}
     if branch:
         body["branch"] = branch
@@ -396,8 +422,8 @@ async def push_bundle(
 
     async with httpx.AsyncClient(timeout=60.0) as client:
         response = await client.post(
-            f"{api_url}/api/repos/{repo_id}/push",
-            headers={"Authorization": f"Bearer {api_key}"},
+            url,
+            headers=_auth_headers_for_json("POST", url, body),
             json=body,
         )
         response.raise_for_status()
@@ -412,12 +438,12 @@ async def create_merge_request(
     repo_id: str,
     source_branch: str,
     title: str,
-    api_key: str,
     target_branch: str | None = None,
     description: str | None = None,
     api_url: str = PRXHUB_API_URL,
 ) -> MergeRequestInfo:
     """Create a merge request."""
+    url = f"{api_url}/api/repos/{repo_id}/mrs"
     body: dict[str, str] = {"sourceBranch": source_branch, "title": title}
     if target_branch:
         body["targetBranch"] = target_branch
@@ -426,8 +452,8 @@ async def create_merge_request(
 
     async with httpx.AsyncClient(timeout=30.0) as client:
         response = await client.post(
-            f"{api_url}/api/repos/{repo_id}/mrs",
-            headers={"Authorization": f"Bearer {api_key}"},
+            url,
+            headers=_auth_headers_for_json("POST", url, body),
             json=body,
         )
         response.raise_for_status()
@@ -445,14 +471,14 @@ async def create_merge_request(
 async def merge_mr(
     repo_id: str,
     mr_id: str,
-    api_key: str,
     api_url: str = PRXHUB_API_URL,
 ) -> dict:
     """Merge a merge request."""
+    url = f"{api_url}/api/repos/{repo_id}/mrs/{mr_id}"
     async with httpx.AsyncClient(timeout=60.0) as client:
         response = await client.post(
-            f"{api_url}/api/repos/{repo_id}/mrs/{mr_id}",
-            headers={"Authorization": f"Bearer {api_key}"},
+            url,
+            headers=_signed_headers("POST", url),
         )
         response.raise_for_status()
         return response.json()

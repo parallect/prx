@@ -2,9 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
-import platformdirs
 import typer
 from rich.console import Console
 from rich.table import Table
@@ -21,18 +18,23 @@ def generate_cmd(
     """Generate a new Ed25519 signing keypair."""
     from prx_spec import generate_keypair
 
-    keypair = generate_keypair()
+    from prx_spec.attestation.keys import DEFAULT_KEY_DIR, PRIVATE_KEY_NAME, PUBLIC_KEY_NAME
+
+    _signing_key, _verify_key, key_id = generate_keypair()
+    key_dir = DEFAULT_KEY_DIR
     console.print("[green]Generated Ed25519 signing key:[/green]")
-    console.print(f"  Key ID:      {keypair.key_id}")
-    console.print(f"  Private key: {keypair.private_path}")
-    console.print(f"  Public key:  {keypair.public_path}")
-    console.print("\nRegister on prxhub.com:  [bold]prx keys register[/bold]")
+    console.print(f"  Key ID:      {key_id}")
+    console.print(f"  Private key: {key_dir / PRIVATE_KEY_NAME}")
+    console.print(f"  Public key:  {key_dir / PUBLIC_KEY_NAME}")
+    console.print("\nRegister on prxhub:  go to Settings > Signing keys on prxhub")
 
 
 @keys_app.command("list")
 def list_cmd() -> None:
     """List local signing keys."""
-    key_dir = Path(platformdirs.user_config_dir("prx")) / "keys"
+    from prx_spec.attestation.keys import DEFAULT_KEY_DIR, get_key_id
+
+    key_dir = DEFAULT_KEY_DIR
 
     if not key_dir.exists():
         console.print("[yellow]No keys found. Run 'prx keys generate' first.[/yellow]")
@@ -43,19 +45,24 @@ def list_cmd() -> None:
         console.print("[yellow]No keys found.[/yellow]")
         return
 
+    import base64
+
+    from nacl.signing import VerifyKey
+
     table = Table(title="Signing Keys")
     table.add_column("Key ID")
-    table.add_column("Public Key File")
+    table.add_column("Public Key (base64)")
     table.add_column("Private Key")
 
     for pub_path in pub_files:
         priv_path = pub_path.with_suffix(".key")
-        key_bytes = pub_path.read_bytes()
-        key_id = f"prx_pub_{key_bytes.hex()[:16]}"
+        verify_key = VerifyKey(pub_path.read_bytes())
+        key_id = get_key_id(verify_key)
+        pub_b64 = base64.b64encode(verify_key.encode()).decode()
 
         table.add_row(
             key_id,
-            str(pub_path),
+            pub_b64,
             "present" if priv_path.exists() else "[red]missing[/red]",
         )
 
@@ -63,23 +70,20 @@ def list_cmd() -> None:
 
 
 @keys_app.command("register")
-def register_cmd(
-    api_key: str = typer.Option(None, "--api-key", help="prxhub API key"),
-) -> None:
-    """Register your public key on prxhub.com."""
+def register_cmd() -> None:
+    """Register your public key on prxhub."""
     console.print(
-        "[yellow]Key registration requires a prxhub.com account. "
-        "This feature is available once prxhub.com is live.[/yellow]"
+        "[yellow]To register a signing key, go to your prxhub Settings page "
+        "and paste the public key (base64) from 'prx keys list'.[/yellow]"
     )
 
 
 @keys_app.command("revoke")
 def revoke_cmd(
     key_id: str = typer.Argument(help="Key ID to revoke (prx_pub_...)"),
-    api_key: str = typer.Option(None, "--api-key", help="prxhub API key"),
 ) -> None:
-    """Revoke a public key on prxhub.com."""
+    """Revoke a public key on prxhub."""
     console.print(
-        "[yellow]Key revocation requires a prxhub.com account. "
-        "This feature is available once prxhub.com is live.[/yellow]"
+        "[yellow]To revoke a signing key, go to your prxhub Settings page "
+        "and click 'Revoke' on the key you want to disable.[/yellow]"
     )
