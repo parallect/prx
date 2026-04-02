@@ -8,3 +8,10 @@ build/
 .pytest_cache/
 .ruff_cache/
 *.prx
+
+# Environment files
+.env
+.env.*
+
+# OS
+.DS_Store
