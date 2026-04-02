@@ -5,11 +5,24 @@ Screen {
 #provider-list {
     width: 1fr;
     max-width: 30;
-    border-right: solid $primary;
+    border: solid $primary-darken-3;
+}
+
+#provider-list:focus-within {
+    border: solid $primary;
+}
+
+#report-scroll {
+    width: 3fr;
+    border: solid $primary-darken-3;
+}
+
+#report-scroll:focus {
+    border: solid $primary;
 }
 
 #report-content {
-    width: 3fr;
+    height: auto;
     padding: 1 2;
 }
 

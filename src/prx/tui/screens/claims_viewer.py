@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from textual.app import ComposeResult
 from textual.screen import Screen
-from textual.widgets import DataTable, Header, Static
+from textual.widgets import DataTable, Footer, Header, Static
 
 
 class ClaimsViewerScreen(Screen):
@@ -14,6 +14,7 @@ class ClaimsViewerScreen(Screen):
         yield Header()
         yield Static("Claims", classes="panel-title")
         yield DataTable(id="claims-table")
+        yield Footer()
 
     def on_mount(self) -> None:
         table = self.query_one(DataTable)

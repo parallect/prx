@@ -12,7 +12,7 @@ console = Console()
 
 
 def config_cmd() -> None:
-    """Interactive setup for prxhub API key and signing preferences."""
+    """Interactive setup for prxhub URL and signing preferences."""
     config_dir = Path(platformdirs.user_config_dir("prx"))
     config_path = config_dir / "config.toml"
 
@@ -25,10 +25,14 @@ def config_cmd() -> None:
     lines = ["# prx CLI configuration\n"]
 
     # prxhub settings
-    prxhub_key = typer.prompt("prxhub API key", default="", show_default=False)
-    if prxhub_key:
+    prxhub_url = typer.prompt(
+        "prxhub URL (leave empty for https://prxhub.com)",
+        default="",
+        show_default=False,
+    )
+    if prxhub_url:
         lines.append("[prxhub]")
-        lines.append(f'api_key = "{prxhub_key}"')
+        lines.append(f'url = "{prxhub_url.rstrip("/")}"')
         lines.append("")
 
     visibility = typer.prompt(

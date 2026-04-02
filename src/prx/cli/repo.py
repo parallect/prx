@@ -9,7 +9,7 @@ from rich.console import Console
 from rich.table import Table
 
 from prx.api import create_repo, list_repos
-from prx.config_mod.settings import PrxSettings
+from prx.api.signing import has_signing_key
 
 console = Console()
 
@@ -22,28 +22,27 @@ def repo_cmd(
     description: str = typer.Option(None, "--desc", "-d", help="Description"),
     visibility: str = typer.Option("public", "--visibility", "-v", help="public or private"),
     owner: str = typer.Option(None, "--owner", help="Owner ID (for list)"),
-    api_key: str = typer.Option(None, "--api-key", help="prxhub API key"),
 ) -> None:
     """Manage research repos on prxhub."""
-    settings = PrxSettings.load()
-    key = api_key or settings.prxhub_api_key
-
     if action == "create":
         if not name:
             console.print("[red]--name is required for create[/red]")
             raise typer.Exit(1)
-        if not key:
-            console.print("[red]API key required. Set via config or --api-key[/red]")
+        if not has_signing_key():
+            console.print(
+                "[red]No signing key found. "
+                "Run 'prx keys generate' and register the key on prxhub.[/red]"
+            )
             raise typer.Exit(1)
         result = asyncio.run(
-            create_repo(name, key, description=description, visibility=visibility)
+            create_repo(name, description=description, visibility=visibility)
         )
         console.print(f"[green]Created repo:[/green] {result.name} ({result.slug})")
         console.print(f"  ID: {result.id}")
         console.print(f"  Visibility: {result.visibility}")
 
     elif action == "list":
-        repos = asyncio.run(list_repos(owner=owner, api_key=key or None))
+        repos = asyncio.run(list_repos(owner=owner))
         if not repos:
             console.print("[dim]No repos found.[/dim]")
             return

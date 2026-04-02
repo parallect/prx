@@ -8,7 +8,7 @@ import typer
 from rich.console import Console
 
 from prx.api import create_merge_request, merge_mr
-from prx.config_mod.settings import PrxSettings
+from prx.api.signing import has_signing_key
 
 console = Console()
 
@@ -21,14 +21,13 @@ def mr_cmd(
     title: str = typer.Option(None, "--title", help="MR title (for create)"),
     description: str = typer.Option(None, "--desc", "-d", help="MR description"),
     mr_id: str = typer.Option(None, "--mr-id", help="Merge request ID (for merge)"),
-    api_key: str = typer.Option(None, "--api-key", help="prxhub API key"),
 ) -> None:
     """Manage merge requests on prxhub repos."""
-    settings = PrxSettings.load()
-    key = api_key or settings.prxhub_api_key
-
-    if not key:
-        console.print("[red]API key required.[/red]")
+    if not has_signing_key():
+        console.print(
+            "[red]No signing key found. "
+            "Run 'prx keys generate' and register the key on prxhub.[/red]"
+        )
         raise typer.Exit(1)
 
     if action == "create":
@@ -37,7 +36,7 @@ def mr_cmd(
             raise typer.Exit(1)
         result = asyncio.run(
             create_merge_request(
-                repo_id, source, title, key,
+                repo_id, source, title,
                 target_branch=target, description=description,
             )
         )
@@ -49,7 +48,7 @@ def mr_cmd(
         if not mr_id:
             console.print("[red]--mr-id required for merge[/red]")
             raise typer.Exit(1)
-        result = asyncio.run(merge_mr(repo_id, mr_id, key))
+        result = asyncio.run(merge_mr(repo_id, mr_id))
         if result.get("merged"):
             console.print(
                 f"[green]Merged![/green] Target: {result.get('targetBranch', 'main')}"
