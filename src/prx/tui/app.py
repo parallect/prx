@@ -8,6 +8,12 @@ from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.widgets import Footer, Header
 
+from prx.tui.screens.bundle_browser import BundleBrowserScreen
+from prx.tui.screens.claims_viewer import ClaimsViewerScreen
+from prx.tui.screens.diff_viewer import DiffViewerScreen
+from prx.tui.screens.report_viewer import ReportViewerScreen
+from prx.tui.screens.sources_viewer import SourcesViewerScreen
+
 
 class PrxApp(App):
     """Terminal UI for browsing .prx bundles."""
@@ -20,12 +26,21 @@ class PrxApp(App):
         Binding("r", "report", "Reports"),
         Binding("c", "claims_view", "Claims"),
         Binding("s", "sources", "Sources"),
+        Binding("d", "diff", "Diff"),
     ]
+
+    SCREENS = {
+        "browser": BundleBrowserScreen,
+        "viewer": ReportViewerScreen,
+        "claims": ClaimsViewerScreen,
+        "sources": SourcesViewerScreen,
+    }
 
     def __init__(self, bundle_path: str | None = None) -> None:
         super().__init__()
         self.bundle_path = bundle_path
         self._bundle = None
+        self._bundle_b = None  # Second bundle for diff
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -61,3 +76,11 @@ class PrxApp(App):
     def action_sources(self) -> None:
         if self._bundle:
             self.push_screen("sources")
+
+    def action_diff(self) -> None:
+        if self._bundle:
+            screen = DiffViewerScreen(
+                bundle_a=self._bundle,
+                bundle_b=self._bundle_b,
+            )
+            self.push_screen(screen)

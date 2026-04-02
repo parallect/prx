@@ -2,7 +2,7 @@
 
 `.prx` format toolkit and [prxhub](https://prxhub.com) CLI.
 
-Read, validate, diff, sign, merge, and publish `.prx` research bundles — the open archive format produced by [Parallect](https://github.com/parallect-ai/parallect).
+Read, validate, diff, sign, merge, and publish `.prx` research bundles — the open archive format produced by [Parallect](https://github.com/parallect/parallect).
 
 ## Install
 
@@ -96,10 +96,16 @@ Stores settings in `~/.config/prx/config.toml`:
 - **Default visibility** — public, unlisted, or private
 - **Signing identity** — name or email for bundle attestation
 
+## Documentation
+
+- [Format Guide](docs/FORMAT.md) — .prx bundle structure and usage
+- [TUI Guide](docs/TUI-GUIDE.md) — Terminal UI screens and shortcuts
+- [prxhub Guide](docs/PRXHUB.md) — Publishing and hub integration
+
 ## Development
 
 ```bash
-git clone https://github.com/parallect-ai/prx.git
+git clone https://github.com/parallect/prx.git
 cd prx
 uv sync --group dev
 uv run pytest tests/ -x -q

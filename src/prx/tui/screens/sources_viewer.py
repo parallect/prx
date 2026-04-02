@@ -23,11 +23,11 @@ class SourcesViewerScreen(Screen):
         if not bundle or not bundle.sources:
             return
 
-        for source in bundle.sources:
+        for source in bundle.sources.sources:
             table.add_row(
-                source.get("url", "")[:40],
-                source.get("title", "")[:30],
-                source.get("quality_tier", ""),
-                ", ".join(source.get("cited_by_providers", [])),
-                str(source.get("citation_count", 0)),
+                (source.url or "")[:40],
+                (source.title or "")[:30],
+                source.quality_tier or "",
+                ", ".join(source.cited_by_providers),
+                str(source.citation_count),
             )

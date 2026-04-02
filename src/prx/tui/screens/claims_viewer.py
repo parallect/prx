@@ -23,11 +23,15 @@ class ClaimsViewerScreen(Screen):
         if not bundle or not bundle.claims:
             return
 
-        for i, claim in enumerate(bundle.claims, 1):
+        for i, claim in enumerate(bundle.claims.claims, 1):
+            content = getattr(claim, "content", "")
+            supporting = getattr(claim, "providers_supporting", [])
+            contradicting = getattr(claim, "providers_contradicting", [])
+            category = getattr(claim, "category", "") or ""
             table.add_row(
                 str(i),
-                claim.get("content", "")[:60],
-                ", ".join(claim.get("providers_supporting", [])),
-                ", ".join(claim.get("providers_contradicting", [])),
-                claim.get("category", ""),
+                content[:60],
+                ", ".join(supporting),
+                ", ".join(contradicting),
+                category,
             )
