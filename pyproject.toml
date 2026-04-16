@@ -1,5 +1,5 @@
 [project]
-name = "prx"
+name = "prx-cli"
 version = "0.1.0"
 description = ".prx format toolkit and prxhub CLI"
 readme = "README.md"
@@ -46,6 +46,3 @@ testpaths = ["tests"]
 [tool.ruff]
 target-version = "py310"
 line-length = 100
-
-[tool.uv.sources]
-prx-spec = { path = "../prx-spec", editable = true }
