@@ -5,9 +5,11 @@
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![CI](https://github.com/parallect/prx/actions/workflows/ci.yml/badge.svg)](https://github.com/parallect/prx/actions/workflows/ci.yml)
 
-**Toolkit and hub CLI for the [`.prx` research bundle format](https://github.com/parallect/prx-spec).**
+**Toolkit and hub CLI for the [Portable Research eXchange (`.prx`)](https://github.com/parallect/prx-spec) format.**
 
-`prx` reads, validates, diffs, merges, signs, and publishes `.prx` archives — the open, portable format for multi-provider AI research produced by [`parallect`](https://github.com/parallect/parallect). It also ships a [prxhub](https://prxhub.com) client for searching, cloning, forking, and collaborating on published bundles.
+PRX is an open format for packaging AI-generated research so it can be shared, verified, and attributed back to the providers and sources behind every claim — privately within a team or publicly to the world. `prx` is the toolkit for working with those archives: read, validate, diff, merge, sign, and publish.
+
+It pairs naturally with [`parallect`](https://github.com/parallect/parallect) (which produces `.prx` bundles from multi-provider research runs) and [prxhub](https://prxhub.com) (the public registry for sharing them).
 
 ```bash
 $ prx read results.prx
