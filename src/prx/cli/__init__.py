@@ -61,7 +61,7 @@ def _open_cmd(
         tui_app = PrxApp(bundle_path=bundle)
         tui_app.run()
     except ImportError:
-        typer.echo("TUI requires the 'tui' extra: pip install prx[tui]", err=True)
+        typer.echo("TUI requires the 'tui' extra: pip install prx-cli[tui]", err=True)
         raise typer.Exit(1)
 
 

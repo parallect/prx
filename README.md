@@ -1,7 +1,7 @@
 # prx
 
-[![PyPI version](https://img.shields.io/pypi/v/prx.svg)](https://pypi.org/project/prx/)
-[![Python](https://img.shields.io/pypi/pyversions/prx.svg)](https://pypi.org/project/prx/)
+[![PyPI version](https://img.shields.io/pypi/v/prx-cli.svg)](https://pypi.org/project/prx-cli/)
+[![Python](https://img.shields.io/pypi/pyversions/prx-cli.svg)](https://pypi.org/project/prx-cli/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![CI](https://github.com/parallect/prx/actions/workflows/ci.yml/badge.svg)](https://github.com/parallect/prx/actions/workflows/ci.yml)
 
@@ -18,13 +18,16 @@ $ prx open                   # Terminal UI browser
 ## Install
 
 ```bash
-pip install prx
+pip install prx-cli
 ```
+
+The CLI is installed as `prx` (the PyPI distribution is `prx-cli` because
+`prx` was already taken).
 
 For the interactive TUI browser:
 
 ```bash
-pip install 'prx[tui]'
+pip install 'prx-cli[tui]'
 ```
 
 Requires Python 3.10+.
@@ -167,8 +170,6 @@ uv sync --group dev
 uv run pytest tests/ -x -q
 uv run ruff check src/ tests/
 ```
-
-Note: `pyproject.toml` pins the sibling [`prx-spec`](https://github.com/parallect/prx-spec) as an editable dep from `../prx-spec` for local development. Clone `prx-spec` as a sibling directory to `prx/`, or remove the `[tool.uv.sources]` block for a PyPI-only install.
 
 ## Contributing
 

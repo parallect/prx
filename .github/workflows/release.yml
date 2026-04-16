@@ -75,4 +75,4 @@ jobs:
           repository: parallect/homebrew-tap
           event-type: pypi-release
           client-payload: |
-            {"package": "prx", "version": "${{ steps.version.outputs.version }}"}
+            {"package": "prx-cli", "version": "${{ steps.version.outputs.version }}"}

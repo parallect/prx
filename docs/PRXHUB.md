@@ -5,7 +5,7 @@ Publish, browse, and manage research bundles on prxhub.com.
 ## Setup
 
 ```bash
-pip install prx
+pip install prx-cli
 ```
 
 Configure your hub credentials:

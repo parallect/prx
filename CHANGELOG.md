@@ -8,4 +8,4 @@ Initial open source release.
 - PRXHub operations: `prx publish`, `prx search`, `prx clone`, `prx fork`, `prx star`, `prx repo`, `prx branch`, `prx push`, `prx mr`
 - Key management: `prx keys generate`, `prx keys show`
 - Configuration: `prx config` with TOML config file support
-- Optional Textual TUI bundle browser via `prx open` (`pip install prx[tui]`)
+- Optional Textual TUI bundle browser via `prx open` (`pip install prx-cli[tui]`)
