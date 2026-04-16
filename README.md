@@ -1,15 +1,24 @@
 # prx
 
-`.prx` format toolkit and [prxhub](https://prxhub.com) CLI.
+[![PyPI version](https://img.shields.io/pypi/v/prx.svg)](https://pypi.org/project/prx/)
+[![Python](https://img.shields.io/pypi/pyversions/prx.svg)](https://pypi.org/project/prx/)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![CI](https://github.com/parallect/prx/actions/workflows/ci.yml/badge.svg)](https://github.com/parallect/prx/actions/workflows/ci.yml)
 
-Read, validate, diff, sign, merge, and publish `.prx` research bundles — the open archive format produced by [Parallect](https://github.com/parallect/parallect).
+**Toolkit and hub CLI for the [`.prx` research bundle format](https://github.com/parallect/prx-spec).**
+
+`prx` reads, validates, diffs, merges, signs, and publishes `.prx` archives — the open, portable format for multi-provider AI research produced by [`parallect`](https://github.com/parallect/parallect). It also ships a [prxhub](https://prxhub.com) client for searching, cloning, forking, and collaborating on published bundles.
+
+```bash
+$ prx read results.prx
+$ prx publish results.prx --collection ai-safety
+$ prx open                   # Terminal UI browser
+```
 
 ## Install
 
 ```bash
 pip install prx
-# or
-uv pip install prx
 ```
 
 For the interactive TUI browser:
@@ -18,89 +27,136 @@ For the interactive TUI browser:
 pip install 'prx[tui]'
 ```
 
-## Quick Start
+Requires Python 3.10+.
+
+## What you can do
+
+- **Read + validate** any `.prx` bundle — L0/L1/L2 structural checks
+- **Verify attestations** — Ed25519 JWS signatures and per-file attestations
+- **Diff and merge** bundles — compute consensus + disagreement between research runs
+- **Publish to prxhub** — share, tag, collection-assign, fork, star
+- **Manage signing keys** — generate, list, register with the hub, revoke
+- **Browse visually** — a terminal UI for exploring bundle contents (with `[tui]` extra)
+
+## Quick start
+
+### Working with local bundles
 
 ```bash
-# Read a bundle
+# Inspect the contents
 prx read results.prx
 
-# Validate bundle structure
+# Structural validation (L0/L1/L2)
 prx validate results.prx
 
-# Verify cryptographic attestation
+# Verify Ed25519 attestations
 prx verify results.prx
 
-# Diff two bundles
+# Diff two bundles — shows added/removed claims and provider drift
 prx diff a.prx b.prx
 
-# Export to markdown / JSON
-prx export results.prx --format markdown
-
-# Merge bundles
+# Merge bundles — combines providers, claims, and sources
 prx merge a.prx b.prx -o combined.prx
 
-# Open the TUI browser
+# Export for sharing
+prx export results.prx --format markdown
+```
+
+### Publishing to prxhub
+
+```bash
+# One-time setup — interactive config for API key and signing identity
+prx config
+
+# Generate a signing keypair (stored in ~/.config/prx/)
+prx keys generate
+
+# Publish a bundle
+prx publish results.prx --visibility public --tags "consensus,distributed-systems"
+
+# Publish directly into a collection (created if missing)
+prx publish results.prx --collection ai-safety
+
+# Search the hub
+prx search "quantum computing"
+
+# Clone someone else's bundle
+prx clone alice/quantum-consensus
+```
+
+### Repositories, branches, merge requests
+
+prxhub supports Git-style collaboration on research. See [`docs/PRXHUB.md`](docs/PRXHUB.md) for the full workflow.
+
+```bash
+prx repo create my-research --description "Ongoing literature review"
+prx branch create alice/my-research experiment
+prx push results.prx --repo my-research --branch experiment
+prx mr create alice/my-research --source experiment --target main
+```
+
+### Terminal UI
+
+```bash
 prx open
 ```
 
-## prxhub Commands
+Browse installed bundles, read synthesis + per-provider reports, and search hub content without leaving the terminal. See [`docs/TUI-GUIDE.md`](docs/TUI-GUIDE.md).
 
-```bash
-# Configure API key and signing identity
-prx config
+## Commands
 
-# Publish a bundle
-prx publish results.prx
+### Bundle tools (offline)
 
-# Search published bundles
-prx search "quantum computing"
+| Command | Purpose |
+|---|---|
+| `prx read <bundle>` | Display bundle contents (query, providers, synthesis) |
+| `prx validate <bundle>` | Structural validation (L0/L1/L2) |
+| `prx verify <bundle>` | Verify cryptographic attestations |
+| `prx diff <a> <b>` | Compare two bundles |
+| `prx merge <a> <b> -o <out>` | Merge providers, claims, sources |
+| `prx export <bundle>` | Export to markdown / JSON |
+| `prx list <dir>` | List bundles in a directory |
+| `prx open` | Terminal UI browser (requires `[tui]`) |
 
-# Clone a bundle
-prx clone owner/repo-name
+### Hub commands
 
-# Fork, star, push
-prx fork owner/repo-name
-prx star owner/repo-name
-prx push results.prx --repo my-research --branch main
-```
+| Command | Purpose |
+|---|---|
+| `prx config` | Interactive configuration |
+| `prx publish <bundle>` | Upload to prxhub |
+| `prx search <query>` | Search published bundles |
+| `prx clone <owner/repo>` | Download a published bundle |
+| `prx fork <owner/repo>` | Fork for follow-on research |
+| `prx star <owner/repo>` | Star a bundle |
+| `prx repo <subcmd>` | Repository management |
+| `prx branch <subcmd>` | Branch management |
+| `prx push <bundle>` | Push to a repo branch |
+| `prx mr <subcmd>` | Merge request management |
 
-## Repository Management
+### Key management
 
-```bash
-prx repo create my-research --description "..."
-prx repo list
-prx branch list owner/repo-name
-prx branch create owner/repo-name feature-branch
-prx mr create owner/repo-name --source feature --target main
-```
+| Command | Purpose |
+|---|---|
+| `prx keys generate` | Generate an Ed25519 signing keypair |
+| `prx keys list` | List local keys |
+| `prx keys register` | Register a public key with prxhub |
+| `prx keys revoke` | Revoke a registered key |
 
-## Key Management
-
-```bash
-# Generate a signing keypair
-prx keys generate
-
-# Export public key
-prx keys export
-```
+Run `prx <command> --help` for full flags.
 
 ## Configuration
 
-```bash
-prx config
-```
+`prx config` writes to `~/.config/prx/config.toml`:
 
-Stores settings in `~/.config/prx/config.toml`:
-
-- **prxhub API key** — for publishing and hub operations
-- **Default visibility** — public, unlisted, or private
-- **Signing identity** — name or email for bundle attestation
+- **prxhub API key** — for publishing and hub operations (get one at [prxhub.com](https://prxhub.com))
+- **Default visibility** — `public`, `unlisted`, or `private`
+- **Signing identity** — name or email embedded in bundle attestations
 
 ## Documentation
 
-- [Format Guide](docs/FORMAT.md) — .prx bundle structure and usage
-- [TUI Guide](docs/TUI-GUIDE.md) — Terminal UI screens and shortcuts
-- [prxhub Guide](docs/PRXHUB.md) — Publishing and hub integration
+- [Format Guide](docs/FORMAT.md) — `.prx` bundle structure
+- [TUI Guide](docs/TUI-GUIDE.md) — terminal UI reference
+- [prxhub Guide](docs/PRXHUB.md) — publishing, collections, repos, merge requests
 
 ## Development
 
@@ -109,8 +165,19 @@ git clone https://github.com/parallect/prx.git
 cd prx
 uv sync --group dev
 uv run pytest tests/ -x -q
+uv run ruff check src/ tests/
 ```
+
+Note: `pyproject.toml` pins the sibling [`prx-spec`](https://github.com/parallect/prx-spec) as an editable dep from `../prx-spec` for local development. Clone `prx-spec` as a sibling directory to `prx/`, or remove the `[tool.uv.sources]` block for a PyPI-only install.
+
+## Contributing
+
+Contributions welcome — see [CONTRIBUTING.md](CONTRIBUTING.md). For security reports, email `security@parallect.ai`.
 
 ## License
 
-MIT
+MIT — see [LICENSE](LICENSE).
+
+---
+
+Built by [SecureCoders](https://securecoders.com). A hosted managed version is available at [parallect.ai](https://parallect.ai) — same `.prx` output, with a multi-provider research API, billing, and a web dashboard.
