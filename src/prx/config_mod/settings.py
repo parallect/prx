@@ -6,7 +6,6 @@ import sys
 from pathlib import Path
 
 import platformdirs
-from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 if sys.version_info >= (3, 11):
