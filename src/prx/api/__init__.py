@@ -141,10 +141,34 @@ def _make_bundle_summary(data: dict) -> BundleSummary:
     )
 
 
+async def resolve_org_id(
+    org_slug: str,
+    api_url: str = PRXHUB_API_URL,
+) -> str:
+    """Resolve an org slug to its ID by listing the user's orgs.
+
+    Raises ValueError if the user is not a member of an org with that slug.
+    """
+    url = f"{api_url}/api/orgs"
+    headers = _signed_headers("GET", url)
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        response = await client.get(url, headers=headers)
+        response.raise_for_status()
+        orgs = response.json().get("orgs", [])
+    for org in orgs:
+        if org.get("slug") == org_slug:
+            return org["id"]
+    available = [o.get("slug") for o in orgs]
+    raise ValueError(
+        f"Organization '{org_slug}' not found. Your orgs: {', '.join(available) or '(none)'}"
+    )
+
+
 async def publish_bundle(
     bundle_path: Path,
     visibility: str = "public",
     tags: list[str] | None = None,
+    org_id: str | None = None,
     api_url: str = PRXHUB_API_URL,
 ) -> PublishResult:
     """Upload a .prx bundle to prxhub.com."""
@@ -168,12 +192,14 @@ async def publish_bundle(
 
         # Step 3: Confirm upload
         confirm_url = f"{api_url}/api/bundles/confirm"
-        confirm_body = {
+        confirm_body: dict = {
             "upload_id": upload_data["upload_id"],
             "storage_key": upload_data["storage_key"],
             "visibility": visibility,
             "tags": tags or [],
         }
+        if org_id:
+            confirm_body["org_id"] = org_id
         confirm = await client.post(
             confirm_url,
             headers=_auth_headers_for_json("POST", confirm_url, confirm_body),

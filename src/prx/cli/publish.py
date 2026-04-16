@@ -15,6 +15,7 @@ def publish_cmd(
     bundle_path: str = typer.Argument(help="Path to .prx bundle"),
     visibility: str | None = typer.Option(None, "--visibility", help="public, unlisted, or private (default: from config)"),
     tags: str | None = typer.Option(None, "--tags", help="Comma-separated tags"),
+    org: str | None = typer.Option(None, "--org", help="Publish under an organization (slug)"),
     collection: str | None = typer.Option(
         None, "--collection", "-c",
         help="Target collection slug. Created automatically if it doesn't exist.",
@@ -25,19 +26,29 @@ def publish_cmd(
     ),
 ) -> None:
     """Upload a .prx bundle to prxhub.com."""
-    asyncio.run(_publish_async(bundle_path, visibility, tags, collection, not no_create_collection))
+    asyncio.run(
+        _publish_async(
+            bundle_path,
+            visibility,
+            tags,
+            org,
+            collection,
+            not no_create_collection,
+        )
+    )
 
 
 async def _publish_async(
     bundle_path: str,
     visibility: str | None,
     tags: str | None,
+    org: str | None,
     collection: str | None,
     create_collection_if_missing: bool,
 ) -> None:
     import httpx
-    from prx.api import PRXHUB_API_URL, publish_bundle
-    from prx.api.signing import has_signing_key, sign_request
+    from prx.api import PRXHUB_API_URL, publish_bundle, resolve_org_id
+    from prx.api.signing import has_signing_key, sign_request  # noqa: F401 -- sign_request used in _link_to_collection
     from prx.config_mod.settings import PrxSettings
 
     settings = PrxSettings.load()
@@ -58,9 +69,20 @@ async def _publish_async(
         raise typer.Exit(1)
 
     tag_list = [t.strip() for t in tags.split(",")] if tags else []
+    api_url = hub_url or "https://prxhub.com"
+
+    org_id: str | None = None
+    if org:
+        try:
+            org_id = await resolve_org_id(org, api_url=api_url)
+        except ValueError as e:
+            console.print(f"[red]{e}[/red]")
+            raise typer.Exit(1)
 
     console.print(f"[bold]Publishing:[/bold] {path.name}")
     console.print(f"[dim]Visibility: {vis}[/dim]")
+    if org:
+        console.print(f"[dim]Organization: {org}[/dim]")
     if hub_url:
         console.print(f"[dim]Hub: {hub_url}[/dim]")
     if tag_list:
@@ -70,6 +92,8 @@ async def _publish_async(
 
     try:
         kwargs: dict = {"visibility": vis, "tags": tag_list}
+        if org_id:
+            kwargs["org_id"] = org_id
         if hub_url:
             kwargs["api_url"] = hub_url
         result = await publish_bundle(path, **kwargs)
