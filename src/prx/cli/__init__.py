@@ -10,6 +10,7 @@ from prx.cli.export import export_cmd
 from prx.cli.fork import fork_cmd
 from prx.cli.keys import keys_app
 from prx.cli.list_cmd import list_cmd
+from prx.cli.login import login_cmd, logout_cmd, whoami_cmd
 from prx.cli.mr import mr_cmd
 from prx.cli.publish import publish_cmd
 from prx.cli.push import push_cmd
@@ -36,6 +37,9 @@ app.command("diff")(diff_cmd)
 app.command("list")(list_cmd)
 
 # Hub operations
+app.command("login")(login_cmd)
+app.command("logout")(logout_cmd)
+app.command("whoami")(whoami_cmd)
 app.command("publish")(publish_cmd)
 app.command("search")(search_cmd)
 app.command("clone")(clone_cmd)
