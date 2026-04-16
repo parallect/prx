@@ -16,16 +16,29 @@ def publish_cmd(
     bundle_path: str = typer.Argument(help="Path to .prx bundle"),
     visibility: str = typer.Option("public", "--visibility", help="public, unlisted, or private"),
     tags: str | None = typer.Option(None, "--tags", help="Comma-separated tags"),
+    collection: str | None = typer.Option(
+        None, "--collection", "-c",
+        help="Target collection slug. Created automatically if it doesn't exist.",
+    ),
+    no_create_collection: bool = typer.Option(
+        False, "--no-create-collection",
+        help="Fail if the --collection slug doesn't exist (don't auto-create).",
+    ),
     api_url: str | None = typer.Option(
         None, "--api-url", help="Override prxhub API URL"
     ),
 ) -> None:
     """Upload a .prx bundle to prxhub."""
-    asyncio.run(_publish_async(bundle_path, visibility, tags, api_url))
+    asyncio.run(_publish_async(bundle_path, visibility, tags, collection, not no_create_collection, api_url))
 
 
 async def _publish_async(
-    bundle_path: str, visibility: str, tags: str | None, api_url: str | None
+    bundle_path: str,
+    visibility: str,
+    tags: str | None,
+    collection: str | None,
+    create_collection_if_missing: bool,
+    api_url: str | None,
 ) -> None:
     from prx.api import AuthRequired, PRXHUB_API_URL, publish_bundle
     from prx.auth import load_token
@@ -64,6 +77,8 @@ async def _publish_async(
     console.print(f"[dim]Target: {resolved_api_url}[/dim]")
     if tag_list:
         console.print(f"[dim]Tags: {', '.join(tag_list)}[/dim]")
+    if collection:
+        console.print(f"[dim]Collection: {collection}[/dim]")
 
     try:
         result = await publish_bundle(
@@ -71,6 +86,8 @@ async def _publish_async(
             visibility=visibility,
             tags=tag_list,
             api_url=resolved_api_url,
+            collection=collection,
+            create_collection_if_missing=create_collection_if_missing,
         )
     except AuthRequired as exc:
         console.print(f"[red]{exc}[/red]")
@@ -84,6 +101,8 @@ async def _publish_async(
 
     console.print("[green]Published![/green]")
     console.print(f"  URL: {result.bundle_url}")
+    if result.collection_url:
+        console.print(f"  Collection: {result.collection_url}")
 
 
 def _handle_http_error(exc: httpx.HTTPStatusError) -> None:

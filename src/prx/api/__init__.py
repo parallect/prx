@@ -73,6 +73,7 @@ def _auth_headers(token: str | None, *, required: bool = True) -> dict[str, str]
 class PublishResult:
     bundle_url: str
     bundle_id: str
+    collection_url: str | None = None
 
 
 @dataclass
@@ -178,8 +179,10 @@ async def publish_bundle(
     api_url: str = PRXHUB_API_URL,
     *,
     token: str | None = None,
+    collection: str | None = None,
+    create_collection_if_missing: bool = True,
 ) -> PublishResult:
-    """Upload a .prx bundle to prxhub."""
+    """Upload a .prx bundle to prxhub, optionally adding to a collection."""
     headers = _auth_headers(token or api_key)
     async with httpx.AsyncClient(timeout=120.0) as client:
         response = await client.post(
@@ -201,10 +204,70 @@ async def publish_bundle(
         confirm.raise_for_status()
         result = confirm.json()
 
+        collection_url: str | None = None
+        if collection:
+            collection_url = await _link_to_collection(
+                client=client,
+                api_url=api_url,
+                headers=headers,
+                bundle_id=result["bundle_id"],
+                collection_slug=collection,
+                create_if_missing=create_collection_if_missing,
+                visibility=visibility,
+            )
+
         return PublishResult(
             bundle_url=result["bundle_url"],
             bundle_id=result["bundle_id"],
+            collection_url=collection_url,
         )
+
+
+async def _link_to_collection(
+    *,
+    client: httpx.AsyncClient,
+    api_url: str,
+    headers: dict,
+    bundle_id: str,
+    collection_slug: str,
+    create_if_missing: bool,
+    visibility: str,
+) -> str | None:
+    """Find or (optionally) create a collection by slug, then link the bundle.
+    Returns the collection URL on success, None on failure."""
+    # Look up by slug via the authed user's collections
+    lookup = await client.get(
+        f"{api_url}/api/collections?per_page=200",
+        headers=headers,
+    )
+    lookup.raise_for_status()
+    owned = lookup.json().get("collections", [])
+    match = next((c for c in owned if c.get("slug") == collection_slug), None)
+
+    if not match:
+        if not create_if_missing:
+            raise RuntimeError(
+                f"Collection '{collection_slug}' not found and --no-create-collection set."
+            )
+        created = await client.post(
+            f"{api_url}/api/collections",
+            headers=headers,
+            json={"name": collection_slug, "visibility": visibility},
+        )
+        created.raise_for_status()
+        match = created.json()
+
+    link = await client.post(
+        f"{api_url}/api/collections/{match['id']}/bundles",
+        headers=headers,
+        json={"bundleId": bundle_id},
+    )
+    link.raise_for_status()
+
+    owner = match.get("owner", {}).get("username") or match.get("ownerUsername")
+    if owner:
+        return f"{api_url}/{owner}/collections/{match.get('slug', collection_slug)}"
+    return None
 
 
 async def search_bundles(
