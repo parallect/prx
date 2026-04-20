@@ -30,5 +30,13 @@ jobs:
       - name: Lint
         run: uv run ruff check src/ tests/
 
-      - name: Test
-        run: uv run pytest tests/ -x -q
+      - name: Unit tests
+        run: uv run pytest tests/ --ignore=tests/e2e -x -q
+
+      - name: E2E tests (real binary + fake hub)
+        run: uv run pytest tests/e2e -v
+        env:
+          # Ensure the subprocess-under-test can't accidentally reach a
+          # real prxhub, even if a test forgets to set PRX_PRXHUB_URL.
+          PRX_PRXHUB_URL: http://127.0.0.1:1
+          NO_COLOR: "1"

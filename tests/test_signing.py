@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
-from nacl.signing import SigningKey, VerifyKey
+from nacl.signing import SigningKey
 
 from prx.api.signing import has_signing_key, sign_request
 
