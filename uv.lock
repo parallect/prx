@@ -386,7 +386,7 @@ wheels = [
 
 [[package]]
 name = "prx-cli"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "." }
 dependencies = [
     { name = "httpx" },
@@ -417,7 +417,7 @@ dev = [
 requires-dist = [
     { name = "httpx", specifier = ">=0.27" },
     { name = "platformdirs", specifier = ">=4.0" },
-    { name = "prx-spec", specifier = ">=0.1.0" },
+    { name = "prx-spec", specifier = ">=0.2.0" },
     { name = "pydantic", specifier = ">=2.0,<3.0" },
     { name = "pydantic-settings", specifier = ">=2.0" },
     { name = "rich", specifier = ">=13.0" },
