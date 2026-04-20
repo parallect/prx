@@ -5,7 +5,7 @@ The prx TUI provides an interactive terminal interface for browsing `.prx` resea
 ## Installation
 
 ```bash
-pip install "prx[tui]"
+pip install "prx-cli[tui]"
 ```
 
 ## Launching
