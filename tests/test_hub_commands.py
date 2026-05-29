@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 from typer.testing import CliRunner
 
+from prx.api import _validate_external_url
 from prx.cli import prx_app
 
 runner = CliRunner()
@@ -121,6 +124,45 @@ class TestCloneCmd:
         mock_download.side_effect = fake_download
         result = runner.invoke(prx_app, ["clone", "uuid-1234"])
         assert result.exit_code == 0
+
+    @patch("prx.api.download_bundle", new_callable=AsyncMock)
+    @patch("prx.api.get_bundle", new_callable=AsyncMock)
+    def test_clone_sanitizes_malicious_slug(self, mock_get, mock_download):
+        """A hub-controlled slug can't write outside cwd (CWE-22)."""
+        mock_get.return_value = FakeBundleSummary(slug="../../../../tmp/evil")
+        captured: dict = {}
+
+        async def fake_download(bid, path, **kwargs):
+            captured["path"] = Path(path)
+            Path(path).write_bytes(b"x")
+            return path
+
+        mock_download.side_effect = fake_download
+        with runner.isolated_filesystem():
+            result = runner.invoke(prx_app, ["clone", "uuid-1234"])
+        assert result.exit_code == 0
+        # Only the basename survives — no traversal out of the current dir.
+        assert captured["path"] == Path("evil.prx")
+
+
+class TestSSRFGuard:
+    def test_allows_normal_https(self):
+        _validate_external_url("https://storage.googleapis.com/bucket/obj?sig=x")
+
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "http://storage.example.com/x",            # non-https
+            "https://169.254.169.254/latest/meta-data/",  # cloud metadata
+            "https://127.0.0.1/x",                      # loopback
+            "https://10.0.0.5/x",                       # private
+            "https://metadata.google.internal/x",       # metadata hostname
+            "https://localhost/x",                      # localhost
+        ],
+    )
+    def test_rejects_ssrf_targets(self, url):
+        with pytest.raises(ValueError):
+            _validate_external_url(url)
 
 
 # ---------------------------------------------------------------------------

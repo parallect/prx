@@ -2,16 +2,57 @@
 
 from __future__ import annotations
 
+import ipaddress
 import json
 import os
 from dataclasses import dataclass
 from pathlib import Path
+from urllib.parse import urlparse
 
 import httpx
 
 from prx.api.signing import sign_request
 
 PRXHUB_API_URL = os.environ.get("PRXHUB_API_URL", "https://prxhub.com")
+
+_BLOCKED_URL_HOSTNAMES = {"localhost", "metadata", "metadata.google.internal"}
+
+
+def _validate_external_url(url: str) -> None:
+    """Guard against SSRF (CWE-918) before following a hub-provided URL.
+
+    download/publish use presigned ``download_url`` / ``upload_url`` values from
+    the hub response. A compromised or MITM'd hub could point those at internal
+    addresses (e.g. the cloud metadata service 169.254.169.254). Require https
+    and a public host. (TOCTOU DNS rebinding remains a residual risk; pin a
+    storage allowlist if that threat model is in scope.)
+    """
+    # Dev/test escape hatch for pointing at a local mock hub over http.
+    # Secure by default — never set this in production.
+    if os.environ.get("PRX_ALLOW_INSECURE_URLS") == "1":
+        return
+    parsed = urlparse(url)
+    if parsed.scheme != "https":
+        raise ValueError(f"Refusing non-https URL from hub: {url!r}")
+    host = parsed.hostname
+    if not host or host.lower() in _BLOCKED_URL_HOSTNAMES:
+        raise ValueError(f"Refusing internal/empty host in hub URL: {host!r}")
+    try:
+        ip = ipaddress.ip_address(host)
+    except ValueError:
+        # Hostname (not an IP literal): https + not-an-internal-name is the bar.
+        # A hostname that DNS-rebinds to an internal IP is a residual risk best
+        # closed by allowlisting the storage host (TODO).
+        return
+    if (
+        ip.is_private
+        or ip.is_loopback
+        or ip.is_link_local
+        or ip.is_reserved
+        or ip.is_multicast
+        or ip.is_unspecified
+    ):
+        raise ValueError(f"Refusing internal address in hub URL: {host!r}")
 
 
 def _signed_headers(
@@ -187,6 +228,7 @@ async def publish_bundle(
         upload_data = response.json()
 
         # Step 2: Upload file to presigned URL
+        _validate_external_url(upload_data["upload_url"])
         with open(bundle_path, "rb") as f:
             await client.put(upload_data["upload_url"], content=f.read())
 
@@ -272,6 +314,7 @@ async def download_bundle(
         response.raise_for_status()
         download_url = response.json()["download_url"]
 
+        _validate_external_url(download_url)
         download = await client.get(download_url)
         download.raise_for_status()
         output_path.write_bytes(download.content)
