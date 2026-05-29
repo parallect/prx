@@ -135,7 +135,12 @@ class TestPublishCommand:
         result = run_prx(
             "publish",
             str(real_bundle_path),
-            env={"PRX_PRXHUB_URL": fake_hub.base_url},
+            # Local mock hub serves the presigned upload over http://localhost;
+            # the SSRF guard blocks that in prod, so opt in for this e2e test.
+            env={
+                "PRX_PRXHUB_URL": fake_hub.base_url,
+                "PRX_ALLOW_INSECURE_URLS": "1",
+            },
         )
         assert result.returncode == 0, (
             f"publish failed unexpectedly: stdout={result.stdout!r} "

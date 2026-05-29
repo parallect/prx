@@ -41,7 +41,13 @@ async def _clone_async(
         out_path = Path(output)
     else:
         slug = info.slug if info else bid[:8]
-        out_path = Path(f"{slug}.prx")
+        # slug comes from the hub response; keep only the final path component so
+        # a malicious slug like "../../../evil" or "/etc/cron.d/x" can't write
+        # outside the current directory (CWE-22).
+        safe_slug = Path(slug).name
+        if not safe_slug or safe_slug in {".", ".."}:
+            safe_slug = bid[:8]
+        out_path = Path(f"{safe_slug}.prx")
 
     console.print(f"[bold]Downloading to:[/bold] {out_path}")
 
